@@ -1,0 +1,1475 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Diretoria — {{ data_display }}{% endblock %}
+
+{% block content %}
+
+{# ===== DATE HEADER + FILTER ===== #}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="text-primary-dark mb-0">
+        <i class="bi bi-calendar3 me-2"></i>{{ dia_semana }}, {{ data_display }}
+        <span class="badge bg-primary ms-2 fs-6">Turno: {{ turno_dia }}</span>
+    </h4>
+    <div class="d-flex align-items-center gap-2">
+        <form method="GET" action="/" class="d-flex align-items-center gap-2 mb-0" id="dateForm">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigateDay(-1)" title="Dia anterior">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <input type="date" class="form-control form-control-sm" name="data"
+                   value="{{ data_input }}" id="dateInput" style="width: 160px;"
+                   onchange="document.getElementById('dateForm').submit()">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigateDay(1)" title="Próximo dia">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            {% if data_input != data_hoje %}
+            <a href="/" class="btn btn-primary btn-sm">
+                <i class="bi bi-calendar-check me-1"></i>Hoje
+            </a>
+            {% endif %}
+            <a href="/relatorio-pdf?data={{ data_input }}" class="btn btn-outline-danger btn-sm ms-2" target="_blank">
+                <i class="bi bi-file-earmark-pdf me-1"></i>Relatório
+            </a>
+            <button type="button" class="btn btn-success btn-sm ms-2 text-white" onclick="openWhatsAppModal('{{ data_input }}')">
+                <i class="bi bi-whatsapp me-1"></i>WhatsApp
+            </button>
+        </form>
+        <span class="badge bg-light text-dark border px-2 py-1 small">
+            <i class="bi bi-arrow-clockwise me-1"></i>Auto-refresh 5 min
+        </span>
+    </div>
+</div>
+
+<!-- WhatsApp Modal -->
+<div class="modal fade" id="whatsappModal" tabindex="-1" aria-labelledby="whatsappModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="whatsappModalLabel"><i class="bi bi-whatsapp me-2"></i>Enviar Relatório</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-3" id="whatsappTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="imagem-tab" data-bs-toggle="tab" data-bs-target="#tab-imagem" type="button" role="tab">Imagem</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="texto-tab" data-bs-toggle="tab" data-bs-target="#tab-texto" type="button" role="tab">Texto</button>
+            </li>
+        </ul>
+        <div class="tab-content" id="whatsappTabsContent">
+            <div class="tab-pane fade show active" id="tab-imagem" role="tabpanel">
+                <div id="screenshotLoading" class="text-center py-4">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Capturando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Gerando imagem do dashboard...</p>
+                </div>
+                <div id="screenshotContainer" class="text-center border rounded bg-light p-2" style="display: none; max-height: 400px; overflow-y: auto;">
+                    <img id="screenshotPreview" src="" alt="Screenshot do Dashboard" class="img-fluid border">
+                </div>
+                <div class="text-center mt-3" id="screenshotActions" style="display: none;">
+                    <a id="btnDownloadImg" class="btn btn-outline-secondary me-2">
+                        <i class="bi bi-download me-1"></i>Baixar Imagem
+                    </a>
+                    <button id="btnShareWhatsApp" class="btn btn-success text-white" onclick="shareScreenshot()">
+                        <i class="bi bi-whatsapp me-1"></i>Compartilhar via WhatsApp
+                    </button>
+                    <div id="shareInstruction" class="text-success small mt-2 fw-bold" style="display: none;">
+                        Imagem salva! Cole (Ctrl+V) no WhatsApp
+                    </div>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab-texto" role="tabpanel">
+                <div id="whatsappLoading" class="text-center py-4">
+                    <div class="spinner-border text-success" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Gerando mensagem...</p>
+                </div>
+                <div id="whatsappContent" style="display: none;">
+                    <div class="p-3 bg-light border rounded mb-3" style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em;" id="whatsappMessageText"></div>
+                </div>
+                <div class="text-end" id="whatsappFooter" style="display: none;">
+                    <button type="button" class="btn btn-outline-primary" onclick="copyWhatsAppMessage()">
+                        <i class="bi bi-clipboard me-1"></i>Copiar
+                    </button>
+                    <a id="btnSendWhatsApp" href="#" target="_blank" class="btn btn-success text-white ms-2">
+                        <i class="bi bi-send me-1"></i>Enviar via WhatsApp Web
+                    </a>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentWhatsAppMsg = "";
+let whatsAppModal = null;
+
+function openWhatsAppModal(dateStr) {
+    // First, capture the screenshot BEFORE opening the modal
+    const content = document.querySelector('.container-fluid.px-4');
+
+    // Show a brief toast that we're capturing
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed top-50 start-50 translate-middle bg-dark text-white px-4 py-3 rounded shadow';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = '<i class="bi bi-camera me-2"></i>Capturando dashboard...';
+    document.body.appendChild(toast);
+
+    html2canvas(content, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: getComputedStyle(document.body).backgroundColor || '#f4f6f9',
+        ignoreElements: (el) => el.classList && el.classList.contains('modal')
+    }).then(canvas => {
+        toast.remove();
+        const imgData = canvas.toDataURL('image/png');
+
+        // Now open modal with the captured image
+        const preview = document.getElementById('screenshotPreview');
+        preview.src = imgData;
+
+        const btnDownload = document.getElementById('btnDownloadImg');
+        btnDownload.href = imgData;
+        btnDownload.download = `Dashboard_${dateStr}.png`;
+
+        // Store for clipboard
+        canvas.toBlob(blob => { window._dashboardBlob = blob; });
+
+        document.getElementById('screenshotLoading').style.display = 'none';
+        document.getElementById('screenshotContainer').style.display = 'block';
+        document.getElementById('screenshotActions').style.display = 'block';
+
+        whatsAppModal = new bootstrap.Modal(document.getElementById('whatsappModal'));
+        whatsAppModal.show();
+    }).catch(() => {
+        toast.remove();
+        whatsAppModal = new bootstrap.Modal(document.getElementById('whatsappModal'));
+        whatsAppModal.show();
+        document.getElementById('screenshotLoading').innerHTML = '<div class="alert alert-warning">Não foi possível capturar a imagem.</div>';
+    });
+
+    // Reset Texto tab
+    document.getElementById('whatsappLoading').style.display = 'block';
+    document.getElementById('whatsappContent').style.display = 'none';
+    document.getElementById('whatsappFooter').style.display = 'none';
+    document.getElementById('shareInstruction').style.display = 'none';
+
+    // Fetch text message in parallel
+    fetch(`/api/whatsapp-message?data=${dateStr}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                currentWhatsAppMsg = data.message;
+                document.getElementById('whatsappMessageText').textContent = data.message;
+                document.getElementById('btnSendWhatsApp').href = `https://web.whatsapp.com/send?text=${encodeURIComponent(data.message)}`;
+
+                document.getElementById('whatsappLoading').style.display = 'none';
+                document.getElementById('whatsappContent').style.display = 'block';
+                document.getElementById('whatsappFooter').style.display = 'block';
+            } else {
+                document.getElementById('whatsappLoading').innerHTML = `<div class="alert alert-danger">Erro ao gerar mensagem: ${data.error}</div>`;
+            }
+        })
+        .catch(err => {
+            document.getElementById('whatsappLoading').innerHTML = `<div class="alert alert-danger">Erro de conexão: ${err}</div>`;
+        });
+}
+
+function shareScreenshot() {
+    document.getElementById('btnDownloadImg').click();
+    document.getElementById('shareInstruction').style.display = 'block';
+    setTimeout(() => {
+        window.open('https://web.whatsapp.com/', '_blank');
+    }, 1500);
+}
+
+function copyWhatsAppMessage() {
+    navigator.clipboard.writeText(currentWhatsAppMsg).then(() => {
+        alert("Mensagem copiada para a área de transferência!");
+    });
+}
+</script>
+<script>
+function navigateDay(offset) {
+    const input = document.getElementById('dateInput');
+    const d = new Date(input.value + 'T12:00:00');
+    d.setDate(d.getDate() + offset);
+    input.value = d.toISOString().split('T')[0];
+    document.getElementById('dateForm').submit();
+}
+</script>
+
+{# ===== KPI CARDS ROW ===== #}
+<div class="row g-3 mb-4">
+    {# DIAS SEM ACIDENTE #}
+    <div class="col-6 col-lg">
+        <div class="card kpi-card h-100 border-0 shadow-sm {{ 'kpi-safe' if seguranca.dias >= 30 else 'kpi-alert' }}">
+            <div class="card-body text-center">
+                <div class="kpi-icon mb-2">
+                    <i class="bi bi-shield-check fs-2"></i>
+                </div>
+                <h2 class="kpi-number mb-1" id="kpi-dias-sem-acidente">{{ seguranca.dias }}</h2>
+                <p class="kpi-label mb-0">Dias sem Acidente</p>
+                <small class="text-muted">Desde {{ seguranca.data_ultimo_acidente }}</small>
+            </div>
+        </div>
+    </div>
+
+    {# PRODUÇÃO LINHA AUTOMÁTICA #}
+    <div class="col-6 col-lg">
+        <div class="card kpi-card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-primary mb-2">
+                    <i class="bi bi-gear-wide-connected fs-2"></i>
+                </div>
+                <h2 class="kpi-number mb-1" id="kpi-auto">{{ auto_hoje.producao|fmt }}</h2>
+                <p class="kpi-label mb-0">Linha Automática</p>
+                <small class="text-muted">Meta: {{ meta_auto|fmt }} un</small>
+                <div class="mt-2">
+                    {% set var_auto = ((auto_hoje.producao - meta_auto) / meta_auto * 100) if meta_auto > 0 else 0 %}
+                    <span class="badge {{ 'bg-success' if var_auto >= 0 else 'bg-danger' }} px-3">
+                        {{ "%+.1f"|format(var_auto) }}%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# PRODUÇÃO LINHA MANUAL #}
+    <div class="col-6 col-lg">
+        <div class="card kpi-card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-info mb-2">
+                    <i class="bi bi-hand-index-thumb fs-2"></i>
+                </div>
+                <p class="kpi-label mb-1">Linha Manual</p>
+                <div class="d-flex justify-content-center gap-3 mb-1">
+                    <div>
+                        <small class="text-muted d-block">Envasados</small>
+                        <span class="fw-bold fs-5">{{ manual_hoje.envasados|fmt }}</span>
+                    </div>
+                    <div class="border-start ps-3">
+                        <small class="text-muted d-block">Finalizados</small>
+                        <span class="fw-bold fs-5 text-primary">{{ manual_hoje.finalizados|fmt }}</span>
+                    </div>
+                </div>
+                <small class="text-muted">Meta: {{ meta_manual|fmt }} un</small>
+                <div class="mt-2">
+                    {% set var_manual = ((manual_hoje.finalizados - meta_manual) / meta_manual * 100) if meta_manual > 0 else 0 %}
+                    <span class="badge {{ 'bg-success' if var_manual >= 0 else 'bg-danger' }} px-3">
+                        {{ "%+.1f"|format(var_manual) }}%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ABSENTEÍSMO #}
+    <div class="col-6 col-lg">
+        <div class="card kpi-card h-100 border-0 shadow-sm {{ 'kpi-alert' if absenteismo_hoje.taxa_geral > 5 else '' }}">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-warning mb-2">
+                    <i class="bi bi-people fs-2"></i>
+                </div>
+                <h2 class="kpi-number mb-1" id="kpi-absenteismo">{{ "%.1f"|format(absenteismo_hoje.taxa_geral) }}%</h2>
+                <p class="kpi-label mb-0">Absenteísmo</p>
+                <small class="text-muted">
+                    {% if absenteismo_hoje.total_previstos > 0 %}
+                        {{ absenteismo_hoje.total_ausentes }} ausentes
+                    {% else %}
+                        Sem registro hoje
+                    {% endif %}
+                </small>
+            </div>
+        </div>
+    </div>
+
+    {# PRODUÇÃO POR PESSOA #}
+    <div class="col-12 col-lg">
+        <div class="card kpi-card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="kpi-icon text-success mb-2">
+                    <i class="bi bi-person-workspace fs-2"></i>
+                </div>
+                {% if absenteismo_hoje and auto_hoje and absenteismo_hoje.total_presentes > 0 %}
+                    {% set prod_pessoa = (auto_hoje.producao / absenteismo_hoje.total_presentes)|int %}
+                    <h2 class="kpi-number mb-1">{{ prod_pessoa|fmt }}</h2>
+                    <p class="kpi-label mb-0">Prod. / Pessoa</p>
+                    <small class="text-muted">{{ absenteismo_hoje.total_presentes }} presentes</small>
+                {% else %}
+                    <h2 class="kpi-number mb-1">—</h2>
+                    <p class="kpi-label mb-0">Prod. / Pessoa</p>
+                    <small class="text-muted">—</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== SEMÁFORO DE STATUS DO DIA ===== #}
+<div class="row mb-4">
+    <div class="col-12">
+        {% set auto_ok = auto_hoje and auto_hoje.producao >= meta_auto %}
+        {% set manual_ok = manual_hoje and manual_hoje.finalizados >= meta_manual %}
+        
+        {% if auto_ok and manual_ok %}
+            <div class="card border-0 bg-success text-white shadow-sm">
+                <div class="card-body d-flex justify-content-between align-items-center py-2">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-check-circle-fill me-2"></i>✅ META ATINGIDA</h5>
+                    <span class="fw-bold">Automática: {{ "%+.1f"|format(var_auto) }}% | Manual: {{ "%+.1f"|format(var_manual) }}%</span>
+                </div>
+            </div>
+        {% elif auto_ok or manual_ok %}
+            <div class="card border-0 bg-warning text-dark shadow-sm">
+                <div class="card-body d-flex justify-content-between align-items-center py-2">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>⚠️ META PARCIAL ({{ 'Manual' if auto_ok else 'Automática' }} abaixo)</h5>
+                    <span class="fw-bold">Automática: {{ "%+.1f"|format(var_auto) }}% | Manual: {{ "%+.1f"|format(var_manual) }}%</span>
+                </div>
+            </div>
+        {% else %}
+            <div class="card border-0 bg-danger text-white shadow-sm">
+                <div class="card-body d-flex justify-content-between align-items-center py-2">
+                    <h5 class="mb-0 fw-bold"><i class="bi bi-x-circle-fill me-2"></i>❌ ABAIXO DA META</h5>
+                    <span class="fw-bold">Automática: {{ "%+.1f"|format(var_auto) }}% | Manual: {{ "%+.1f"|format(var_manual) }}%</span>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ===== JUSTIFICATIVAS (only when below target) ===== #}
+{% if observacoes_dia %}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm border-start border-warning border-4">
+            <div class="card-body py-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="bi bi-exclamation-triangle-fill text-warning me-2 fs-5"></i>
+                    <span class="fw-bold">Justificativas — Meta não atingida em {{ data_display }}</span>
+                </div>
+                <div class="row">
+                    {% set setores_vistos = [] %}
+                    {% for obs in observacoes_dia %}
+                    {% if obs.setor not in setores_vistos %}
+                    {% if setores_vistos.append(obs.setor) %}{% endif %}
+                    <div class="col-md-6 col-lg-3 mb-2">
+                        <div class="d-flex align-items-start">
+                            <span class="badge bg-secondary me-2 mt-1">{{ obs.setor }}</span>
+                            <small class="text-muted">
+                                {% for o in observacoes_dia if o.setor == obs.setor %}
+                                {{ o.obs }}{% if not loop.last %}; {% endif %}
+                                {% endfor %}
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ===== EFFICIENCY GAUGES + WEEKLY CHARTS ===== #}
+<div class="row g-3 mb-2">
+    <div class="col-12 d-flex align-items-center justify-content-between">
+        <span class="fw-bold text-muted small">Período dos gráficos:</span>
+        <div class="btn-group btn-group-sm" role="group" id="periodFilter">
+            <button type="button" class="btn btn-outline-primary active" data-dias="7">7 dias</button>
+            <button type="button" class="btn btn-outline-primary" data-dias="15">15 dias</button>
+            <button type="button" class="btn btn-outline-primary" data-dias="30">30 dias</button>
+        </div>
+    </div>
+</div>
+<div class="row g-3 mb-4">
+    {# LINHA AUTOMÁTICA — Gauge + Chart #}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 d-flex align-items-center">
+                <i class="bi bi-gear-wide-connected text-primary me-2"></i>
+                <h6 class="mb-0 fw-bold">Linha Automática — <span id="labelPeriodoAuto">Semana</span></h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-4 d-flex align-items-center justify-content-center">
+                        <div class="gauge-container">
+                            <canvas id="gaugeAuto" width="150" height="150"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-8">
+                        <canvas id="chartAutoSemana" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# LINHA MANUAL — Gauge + Chart #}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 d-flex align-items-center">
+                <i class="bi bi-hand-index-thumb text-info me-2"></i>
+                <h6 class="mb-0 fw-bold">Linha Manual — <span id="labelPeriodoManual">Semana</span></h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-4 d-flex align-items-center justify-content-center">
+                        <div class="gauge-container">
+                            <canvas id="gaugeManual" width="150" height="150"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-8">
+                        <canvas id="chartManualSemana" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== COMPARATIVO DE TURNOS — MÊS ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-person-fill text-primary me-2"></i><span class="fw-bold">Caio</span>
+                <span class="badge bg-light text-dark ms-2">{{ turno_comparativo['Caio'].dias }} dias</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <div>
+                        <small class="text-muted d-block">Média Diária</small>
+                        <span class="fs-4 fw-bold text-primary">{{ turno_comparativo['Caio'].media|fmt }}</span>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted d-block">Total do Mês</small>
+                        <span class="fs-4 fw-bold text-primary">{{ turno_comparativo['Caio'].total|fmt }}</span>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <div>
+                        <span class="text-success"><i class="bi bi-arrow-up-circle"></i> Melhor dia:</span><br>
+                        {{ turno_comparativo['Caio'].melhor_dia.data }} - {{ turno_comparativo['Caio'].melhor_dia.producao|fmt }} un
+                    </div>
+                    <div class="text-end">
+                        <span class="text-danger"><i class="bi bi-arrow-down-circle"></i> Pior dia:</span><br>
+                        {{ turno_comparativo['Caio'].pior_dia.data }} - {{ turno_comparativo['Caio'].pior_dia.producao|fmt }} un
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-person-fill text-warning me-2" style="color: #fd7e14 !important;"></i><span class="fw-bold">Douglas</span>
+                <span class="badge bg-light text-dark ms-2">{{ turno_comparativo['Douglas'].dias }} dias</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <div>
+                        <small class="text-muted d-block">Média Diária</small>
+                        <span class="fs-4 fw-bold" style="color: #fd7e14;">{{ turno_comparativo['Douglas'].media|fmt }}</span>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted d-block">Total do Mês</small>
+                        <span class="fs-4 fw-bold" style="color: #fd7e14;">{{ turno_comparativo['Douglas'].total|fmt }}</span>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between small">
+                    <div>
+                        <span class="text-success"><i class="bi bi-arrow-up-circle"></i> Melhor dia:</span><br>
+                        {{ turno_comparativo['Douglas'].melhor_dia.data }} - {{ turno_comparativo['Douglas'].melhor_dia.producao|fmt }} un
+                    </div>
+                    <div class="text-end">
+                        <span class="text-danger"><i class="bi bi-arrow-down-circle"></i> Pior dia:</span><br>
+                        {{ turno_comparativo['Douglas'].pior_dia.data }} - {{ turno_comparativo['Douglas'].pior_dia.producao|fmt }} un
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== MONTHLY TREND — AUTOMATIC LINE ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-graph-up text-success me-2"></i>
+                    <span class="fw-bold">Produção Mensal — Linha Automática</span>
+                </div>
+                <div class="text-muted small">
+                    {% if auto_resumo_mes %}
+                        Total: {{ auto_resumo_mes.total_producao|fmt }} un | {{ auto_resumo_mes.dias_trabalhados }} dias
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="chartTendenciaMes" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== MONTHLY TREND — MANUAL LINE ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-graph-up text-info me-2"></i>
+                    <span class="fw-bold">Produção Mensal — Linha Manual</span>
+                </div>
+                <div class="text-muted small">
+                    {% if manual_resumo_mes %}
+                        Finalizados: {{ manual_resumo_mes.total_finalizados|fmt }} un | Envasados: {{ manual_resumo_mes.total_envasados|fmt }} un
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="chartTendenciaManual" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== FULL MONTH TABLE — AUTOMATIC LINE ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-table text-primary me-2"></i>
+                <span class="fw-bold">Histórico Completo — Linha Automática (Mês)</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 text-center small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-start ps-3">Dia</th>
+                                <th>Data</th>
+                                <th>Turno</th>
+                                <th>Produção</th>
+                                <th>Embalagem</th>
+                                <th>Celofane</th>
+                                <th>Meta</th>
+                                <th>Eficiência</th>
+                                <th>Presentes</th>
+                                <th>Prod/Pessoa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in historico_completo %}
+                            <tr>
+                                <td class="text-start ps-3 fw-bold">{{ d.dia_semana }}</td>
+                                <td>{{ d.data[8:] }}/{{ d.data[5:7] }}</td>
+                                <td><span class="badge bg-{{ 'primary' if d.turno == 'Caio' else 'info' }}">{{ d.turno }}</span></td>
+                                <td class="fw-bold">{{ d.producao|fmt }}</td>
+                                <td>{{ d.embalagem|fmt }}</td>
+                                <td>{{ d.celofane|fmt }}</td>
+                                <td class="text-muted">{{ d.meta|fmt }}</td>
+                                <td>
+                                    {% set efi = d.eficiencia %}
+                                    {% if d.producao > 0 %}
+                                        <span class="badge {{ 'bg-success' if efi >= 100 else ('bg-warning text-dark' if efi >= 80 else 'bg-danger') }}">
+                                            {{ "%.1f"|format(efi) }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if d.presentes > 0 %}
+                                        <strong>{{ d.presentes }}</strong>
+                                    {% else %}
+                                        <span class="text-muted" title="Sem registro de absenteísmo">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if d.prod_por_pessoa %}
+                                        <strong>{{ "%.0f"|format(d.prod_por_pessoa) }}</strong>
+                                    {% else %}
+                                        <span class="text-muted" title="Sem registro de absenteísmo">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== FULL MONTH TABLE — SLEEVE ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-table text-warning me-2"></i>
+                    <span class="fw-bold">Histórico Completo — Sleeve (Mês)</span>
+                </div>
+                <div class="text-muted small">
+                    {% set sleeve_valid = historico_completo | selectattr("sleeve", ">", 0) | list %}
+                    {% if sleeve_valid %}
+                        {% set sleeve_total = sleeve_valid | sum(attribute="sleeve") %}
+                        Total: {{ sleeve_total|fmt }} un | {{ sleeve_valid|length }} dias
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 text-center small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-start ps-3">Dia</th>
+                                <th>Data</th>
+                                <th>Turno</th>
+                                <th>Produção Sleeve</th>
+                                <th>Meta</th>
+                                <th>Diferença</th>
+                                <th>Eficiência</th>
+                                <th>Justificativa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in historico_completo %}
+                            {% if d.sleeve > 0 or d.sleeve_meta > 0 %}
+                            <tr>
+                                <td class="text-start ps-3 fw-bold">{{ d.dia_semana }}</td>
+                                <td>{{ d.data[8:] }}/{{ d.data[5:7] }}</td>
+                                <td><span class="badge bg-{{ 'primary' if d.turno == 'Caio' else 'info' }}">{{ d.turno }}</span></td>
+                                <td class="fw-bold">{{ d.sleeve|fmt }}</td>
+                                <td class="text-muted">{{ d.sleeve_meta|fmt }}</td>
+                                <td>
+                                    {% if d.sleeve > 0 and d.sleeve_meta > 0 %}
+                                        {% set diff = d.sleeve - d.sleeve_meta %}
+                                        <span class="fw-bold {{ 'text-success' if diff >= 0 else 'text-danger' }}">
+                                            {{ "%+.0f"|format(diff)|replace('+', '+')|replace('-', '−') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if d.sleeve > 0 and d.sleeve_meta > 0 %}
+                                        {% set sefi = d.sleeve_eficiencia %}
+                                        <span class="badge {{ 'bg-success' if sefi >= 100 else ('bg-warning text-dark' if sefi >= 80 else 'bg-danger') }}">
+                                            {{ "%.1f"|format(sefi) }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-start small">
+                                    {% if d.sleeve_obs %}
+                                        <span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>{{ d.sleeve_obs }}</span>
+                                    {% elif d.sleeve > 0 and d.sleeve_meta > 0 and d.sleeve >= d.sleeve_meta %}
+                                        <span class="text-success"><i class="bi bi-check-circle"></i></span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# RANKING MELHORES E PIORES DIAS #}
+    <div class="col-lg-7">
+        <div class="row g-3 mb-3">
+            {% set hist_valid = historico_completo | selectattr("producao", ">", 0) | list %}
+            {% set melhores = hist_valid | sort(attribute="producao", reverse=True) %}
+            {% set piores = hist_valid | sort(attribute="producao") %}
+            
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0">
+                        <span class="fw-bold"><i class="bi bi-trophy text-warning me-2"></i>🏆 Melhores Dias</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush small">
+                            {% for d in melhores[:5] %}
+                            {% set var = ((d.producao - d.meta) / d.meta * 100) if d.meta > 0 else 0 %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ d.data[8:] }}/{{ d.data[5:7] }}</span>
+                                <strong>{{ d.producao|fmt }}</strong>
+                                <span class="badge {{ 'bg-success' if var >= 0 else 'bg-danger' }}">{{ "%+.1f"|format(var) }}%</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white border-0">
+                        <span class="fw-bold"><i class="bi bi-graph-down-arrow text-danger me-2"></i>📉 Piores Dias</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush small">
+                            {% for d in piores[:5] %}
+                            {% set var = ((d.producao - d.meta) / d.meta * 100) if d.meta > 0 else 0 %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ d.data[8:] }}/{{ d.data[5:7] }}</span>
+                                <strong>{{ d.producao|fmt }}</strong>
+                                <span class="badge {{ 'bg-success' if var >= 0 else 'bg-danger' }}">{{ "%+.1f"|format(var) }}%</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# DETAIL — MANUAL LINE: Products of the day + weekly summary #}
+    <div class="col-lg-5">
+        {# Products of the day #}
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-droplet text-info me-2"></i>
+                <span class="fw-bold">Perfumes Produzidos — {{ data_display }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if manual_produtos %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-start ps-3">Produto</th>
+                                <th>Lote</th>
+                                <th class="text-end">Envasados</th>
+                                <th class="text-end">Finalizados</th>
+                                <th class="text-end pe-3">Retrab.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in manual_produtos %}
+                            <tr>
+                                <td class="text-start ps-3 fw-bold">{{ p.produto }}</td>
+                                <td>
+                                    {% if p.lote %}
+                                        <span class="badge bg-secondary">{{ p.lote }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if p.envasados > 0 %}
+                                        {{ p.envasados|fmt }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if p.finalizados > 0 %}
+                                        {{ p.finalizados|fmt }}
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-3">
+                                    {% if p.retrabalhadas is defined and p.retrabalhadas > 0 %}
+                                        <span class="text-warning fw-bold">{{ p.retrabalhadas|fmt }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td class="text-start ps-3" colspan="2">Total</td>
+                                <td class="text-end">{{ manual_hoje.envasados|fmt }}</td>
+                                <td class="text-end pe-3">{{ manual_hoje.finalizados|fmt }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                    <p class="mb-0">Nenhum registro nesta data.</p>
+                    <small>Registre via <a href="/admin">Admin</a> colando a mensagem do WhatsApp.</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Weekly summary #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-table text-info me-2"></i>
+                <span class="fw-bold">Linha Manual — Semana</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0 text-center small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-start ps-3">Dia</th>
+                                <th>Data</th>
+                                <th>Envasados</th>
+                                <th>Finalizados</th>
+                                <th>Eficiência</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in manual_semana %}
+                            <tr>
+                                <td class="text-start ps-3 fw-bold">{{ d.dia_semana }}</td>
+                                <td>{{ d.data[8:] }}/{{ d.data[5:7] }}</td>
+                                <td class="fw-bold">{{ d.envasados|fmt }}</td>
+                                <td>{{ d.finalizados|fmt }}</td>
+                                <td>
+                                    {% set efi = d.eficiencia %}
+                                    {% if d.envasados > 0 %}
+                                        <span class="badge {{ 'bg-success' if efi >= 100 else ('bg-warning text-dark' if efi >= 80 else 'bg-danger') }}">
+                                            {{ "%.1f"|format(efi) }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== MONTH VS MONTH COMPARISON ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0">
+                <i class="bi bi-arrow-left-right text-primary me-2"></i>
+                <span class="fw-bold">Comparativo Mensal — Linha Automática</span>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    {# Mês Anterior #}
+                    <div class="col-md-5">
+                        <div class="p-3 border rounded bg-light">
+                            <h6 class="text-muted mb-2">Mês Anterior ({{ prev_month_name }})</h6>
+                            <h3 class="fw-bold mb-1">{{ auto_resumo_mes_anterior.total_producao|fmt }} <small class="fs-6 fw-normal text-muted">un</small></h3>
+                            <div class="small text-muted">Meta: {{ auto_resumo_mes_anterior.total_meta|fmt }}</div>
+                        </div>
+                    </div>
+                    
+                    {# Variação e Trend #}
+                    <div class="col-md-2 text-center py-3">
+                        <div class="mb-1">
+                            {% if auto_resumo_mes.total_producao >= mes_anterior_mesmo_periodo %}
+                                <i class="bi bi-arrow-up-circle-fill text-success fs-1"></i>
+                            {% else %}
+                                <i class="bi bi-arrow-down-circle-fill text-danger fs-1"></i>
+                            {% endif %}
+                        </div>
+                        <div class="small text-muted mb-1">Nos primeiros {{ dias_decorridos }} dias:</div>
+                        <div class="small fw-bold mb-1" style="white-space: nowrap;">
+                            {{ prev_month_name[:3] }} = {{ mes_anterior_mesmo_periodo|fmt }} | {{ curr_month_name[:3] }} = {{ auto_resumo_mes.total_producao|fmt }}
+                        </div>
+                        <span class="badge {{ 'bg-success' if auto_resumo_mes.total_producao >= mes_anterior_mesmo_periodo else 'bg-danger' }} px-2 py-1 mt-1">
+                            {% set var_mesmo_periodo = ((auto_resumo_mes.total_producao - mes_anterior_mesmo_periodo) / mes_anterior_mesmo_periodo * 100) if mes_anterior_mesmo_periodo > 0 else 0 %}
+                            Variação: {{ "%+.1f"|format(var_mesmo_periodo) }}%
+                        </span>
+                    </div>
+
+                    {# Mês Atual e Projeção #}
+                    <div class="col-md-5">
+                        <div class="p-3 border rounded bg-light">
+                            <h6 class="text-primary mb-2">Mês Atual ({{ curr_month_name }})</h6>
+                            <h3 class="fw-bold mb-1 text-primary">{{ auto_resumo_mes.total_producao|fmt }} <small class="fs-6 fw-normal text-muted">un</small></h3>
+                            <div class="small text-muted">
+                                <span class="fw-bold">Projeção final:</span> {{ projecao_mes_auto|fmt }} un
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {# Bar Chart Comparativo Simples #}
+                <div class="progress mt-4" style="height: 12px;">
+                    {% set max_val = [projecao_mes_auto, auto_resumo_mes_anterior.total_producao]|max %}
+                    {% set max_val = max_val if max_val > 0 else 1 %}
+                    {% set prev_w = (auto_resumo_mes_anterior.total_producao / max_val * 100)|round %}
+                    {% set curr_w = (auto_resumo_mes.total_producao / max_val * 100)|round %}
+                    {% set proj_w = ((projecao_mes_auto - auto_resumo_mes.total_producao) / max_val * 100)|round %}
+                    {% if proj_w < 0 %}{% set proj_w = 0 %}{% endif %}
+                    
+                    <div class="progress-bar bg-secondary opacity-50" role="progressbar" style="width: {{ prev_w }}%;" title="Mês Anterior: {{ auto_resumo_mes_anterior.total_producao|fmt }}"></div>
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ curr_w }}%;" title="Mês Atual: {{ auto_resumo_mes.total_producao|fmt }}"></div>
+                    <div class="progress-bar bg-info progress-bar-striped opacity-50" role="progressbar" style="width: {{ proj_w }}%;" title="Projeção restante"></div>
+                </div>
+                <div class="d-flex justify-content-between mt-1 small text-muted">
+                    <span>Mês Anterior (cinza)</span>
+                    <span>Atual (azul) + Projeção (listrado)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== MONTHLY SUMMARY CARDS ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase small mb-3">
+                    <i class="bi bi-calendar-month me-1"></i>Resumo Mensal — Linha Automática
+                </h6>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold text-primary">{{ auto_resumo_mes.total_producao|fmt }}</div>
+                        <small class="text-muted">Produção Total</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold text-secondary">{{ auto_resumo_mes.total_meta|fmt }}</div>
+                        <small class="text-muted">Meta Total</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold {{ 'text-success' if auto_resumo_mes.eficiencia_media >= 100 else ('text-warning' if auto_resumo_mes.eficiencia_media >= 80 else 'text-danger') }}">
+                            {{ auto_resumo_mes.eficiencia_media }}%
+                        </div>
+                        <small class="text-muted">Eficiência Média</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase small mb-3">
+                    <i class="bi bi-calendar-month me-1"></i>Resumo Mensal — Linha Manual
+                </h6>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold text-info">{{ manual_resumo_mes.total_finalizados|fmt }}</div>
+                        <small class="text-muted">Total Finalizados</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold text-secondary">{{ manual_resumo_mes.total_meta|fmt }}</div>
+                        <small class="text-muted">Meta Total</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-5 fw-bold {{ 'text-success' if manual_resumo_mes.eficiencia_media >= 100 else ('text-warning' if manual_resumo_mes.eficiencia_media >= 80 else 'text-danger') }}">
+                            {{ manual_resumo_mes.eficiencia_media }}%
+                        </div>
+                        <small class="text-muted">Eficiência Média</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{# ===== ABSENTEEISM — BOTTOM ===== #}
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 d-flex align-items-center">
+                <i class="bi bi-people text-warning me-2"></i>
+                <span class="fw-bold">Absenteísmo — Semana</span>
+            </div>
+            <div class="card-body">
+                <canvas id="chartAbsenteismo" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <h6 class="text-muted text-uppercase small mb-3">
+                    <i class="bi bi-people me-1"></i>Absenteísmo Hoje — {{ data_display }}
+                </h6>
+                <div class="row">
+                    <div class="col-4">
+                        <div class="fs-3 fw-bold {{ 'text-danger' if absenteismo_hoje.taxa_geral > 5 else ('text-warning' if absenteismo_hoje.taxa_geral > 2 else 'text-success') }}">
+                            {{ "%.1f"|format(absenteismo_hoje.taxa_geral) }}%
+                        </div>
+                        <small class="text-muted">Taxa</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-3 fw-bold text-primary">
+                            {% if absenteismo_hoje.total_previstos > 0 %}
+                                {{ absenteismo_hoje.total_presentes }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">Presentes</small>
+                    </div>
+                    <div class="col-4">
+                        <div class="fs-3 fw-bold text-danger">
+                            {% if absenteismo_hoje.total_previstos > 0 %}
+                                {{ absenteismo_hoje.total_ausentes }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">Ausentes</small>
+                    </div>
+                </div>
+                {% if absenteismo_hoje.total_previstos > 0 %}
+                <div class="mt-3">
+                    <span class="badge bg-primary px-3 py-2">Turno: {{ turno_dia }}</span>
+                    <span class="badge bg-secondary px-3 py-2">Total previsto: {{ absenteismo_hoje.total_previstos }}</span>
+                </div>
+                {% else %}
+                <div class="mt-3 text-muted">
+                    <i class="bi bi-info-circle me-1"></i>Sem registro de absenteísmo nesta data
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ===== DATA FROM SERVER =====
+const autoSemana = {{ auto_semana | tojson }};
+const manualSemana = {{ manual_semana | tojson }};
+const autoMes = {{ auto_resumo_mes | tojson }};
+const absSemana = {{ absenteismo_semana | tojson }};
+const metaAuto = {{ meta_auto }};
+const metaManual = {{ meta_manual }};
+const metasPorDia = {{ metas_por_dia | tojson }};
+const efiAuto = {{ auto_hoje.eficiencia }};
+const efiManual = {{ manual_hoje.eficiencia }};
+
+// ===== UTILITY =====
+function fmtNum(n) {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+// ===== GAUGE CHART =====
+function createGauge(canvasId, value, maxValue) {
+    const pct = Math.min(value, 150);  // cap at 150%
+    let color = pct >= 100 ? '#198754' : (pct >= 80 ? '#ffc107' : '#dc3545');
+
+    const ctx = document.getElementById(canvasId).getContext('2d');
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [pct, Math.max(0, 150 - pct)],
+                backgroundColor: [color, '#e9ecef'],
+                borderWidth: 0,
+                circumference: 270,
+                rotation: 225,
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '75%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            }
+        },
+        plugins: [{
+            id: 'gaugeText',
+            afterDraw(chart) {
+                const { ctx, chartArea } = chart;
+                const cx = (chartArea.left + chartArea.right) / 2;
+                const cy = (chartArea.top + chartArea.bottom) / 2 + 10;
+                ctx.save();
+                ctx.font = 'bold 22px Arial';
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.fillText(value.toFixed(1) + '%', cx, cy);
+                ctx.font = '11px Arial';
+                ctx.fillStyle = '#6c757d';
+                ctx.fillText('eficiência', cx, cy + 18);
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+createGauge('gaugeAuto', efiAuto, 150);
+createGauge('gaugeManual', efiManual, 150);
+
+// ===== WEEKLY CHARTS (reusable) =====
+let chartAutoSemana = null;
+let chartManualSemana = null;
+
+function renderAutoSemana(data) {
+    const labels = data.map(d => d.data ? d.data.substring(8) + '/' + d.data.substring(5,7) : d.dia_semana);
+    const prods = data.map(d => d.producao);
+    const metas = data.map(d => d.meta_dia || metaAuto);
+
+    if (chartAutoSemana) chartAutoSemana.destroy();
+    chartAutoSemana = new Chart(document.getElementById('chartAutoSemana'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Produção',
+                    data: prods,
+                    backgroundColor: prods.map((v, i) => v >= metas[i] ? 'rgba(25, 135, 84, 0.7)' : 'rgba(13, 110, 253, 0.7)'),
+                    borderRadius: 4,
+                    barPercentage: 0.7,
+                },
+                {
+                    label: 'Meta',
+                    data: metas,
+                    type: 'line',
+                    borderColor: '#dc3545',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    pointRadius: data.length > 15 ? 0 : 3,
+                    fill: false,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw) } }
+            },
+            scales: {
+                x: { ticks: { maxRotation: data.length > 15 ? 90 : 0, font: { size: data.length > 15 ? 9 : 11 } } },
+                y: { beginAtZero: true, ticks: { callback: v => fmtNum(v) } }
+            }
+        }
+    });
+}
+
+function renderManualSemana(data) {
+    const labels = data.map(d => d.data ? d.data.substring(8) + '/' + d.data.substring(5,7) : d.dia_semana);
+    const envs = data.map(d => d.envasados);
+    const fins = data.map(d => d.finalizados);
+    const metas = data.map(d => d.meta_dia || metaManual);
+
+    if (chartManualSemana) chartManualSemana.destroy();
+    chartManualSemana = new Chart(document.getElementById('chartManualSemana'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Envasados',
+                    data: envs,
+                    backgroundColor: 'rgba(13, 202, 240, 0.7)',
+                    borderRadius: 4,
+                    barPercentage: 0.6,
+                },
+                {
+                    label: 'Finalizados',
+                    data: fins,
+                    backgroundColor: 'rgba(108, 117, 125, 0.5)',
+                    borderRadius: 4,
+                    barPercentage: 0.6,
+                },
+                {
+                    label: 'Meta',
+                    data: metas,
+                    type: 'line',
+                    borderColor: '#dc3545',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    pointRadius: data.length > 15 ? 0 : 3,
+                    fill: false,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw) } }
+            },
+            scales: {
+                x: { ticks: { maxRotation: data.length > 15 ? 90 : 0, font: { size: data.length > 15 ? 9 : 11 } } },
+                y: { beginAtZero: true, ticks: { callback: v => fmtNum(v) } }
+            }
+        }
+    });
+}
+
+// Initial render with 7 days
+renderAutoSemana(autoSemana);
+renderManualSemana(manualSemana);
+
+// Period filter handler
+const periodLabels = {7: '7 dias', 15: '15 dias', 30: '30 dias'};
+document.getElementById('periodFilter').addEventListener('click', function(e) {
+    const btn = e.target.closest('button[data-dias]');
+    if (!btn) return;
+    const dias = btn.dataset.dias;
+
+    // Update active button
+    this.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Update labels
+    document.getElementById('labelPeriodoAuto').textContent = periodLabels[dias];
+    document.getElementById('labelPeriodoManual').textContent = periodLabels[dias];
+
+    // Fetch new data
+    const dataParam = '{{ data_input }}';
+    fetch(`/api/semana?data=${dataParam}&dias=${dias}`)
+        .then(r => r.json())
+        .then(data => {
+            renderAutoSemana(data.auto_semana);
+            renderManualSemana(data.manual_semana);
+        })
+        .catch(err => console.error('Erro ao carregar período:', err));
+});
+
+
+// ===== BAR CHART — COMPARATIVO DE TURNOS =====
+const historicoTurnos = {{ historico_completo | tojson }};
+const labelsTurnos = historicoTurnos.map(d => d.data.substring(8) + '/' + d.data.substring(5,7));
+const dataCaio = historicoTurnos.map(d => d.turno === 'Caio' ? d.producao : null);
+const dataDouglas = historicoTurnos.map(d => d.turno === 'Douglas' ? d.producao : null);
+
+new Chart(document.getElementById('chartTurnos'), {
+    type: 'bar',
+    data: {
+        labels: labelsTurnos,
+        datasets: [
+            {
+                label: 'Caio',
+                data: dataCaio,
+                backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                borderRadius: 4,
+            },
+            {
+                label: 'Douglas',
+                data: dataDouglas,
+                backgroundColor: 'rgba(253, 126, 20, 0.7)',
+                borderRadius: 4,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+                callbacks: {
+                    label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw || 0)
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { callback: v => fmtNum(v) }
+            }
+        }
+    }
+});
+
+// ===== LINE CHART — MONTHLY TREND =====
+// Fetch monthly data using the selected date filter
+const selectedDate = '{{ data_input }}';
+fetch('/api/historico?data=' + selectedDate)
+    .then(r => r.json())
+    .then(data => {
+        const mes = data.auto_mes || [];
+        const labels = mes.map(d => d.data.substring(8));  // day only
+        const prods = mes.map(d => d.producao);
+        const metas = mes.map(d => {
+            const m = metasPorDia[d.data];
+            return m ? m.auto : metaAuto;
+        });
+
+        // Cumulative production
+        let cumProd = [], cumMeta = [], sumP = 0, sumM = 0;
+        for (let i = 0; i < prods.length; i++) {
+            sumP += prods[i];
+            sumM += metas[i];
+            cumProd.push(sumP);
+            cumMeta.push(sumM);
+        }
+
+        new Chart(document.getElementById('chartTendenciaMes'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Produção Diária',
+                        data: prods,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: prods.map((v, i) => v >= metas[i] ? '#198754' : '#dc3545'),
+                    },
+                    {
+                        label: 'Meta Diária',
+                        data: metas,
+                        borderColor: '#dc3545',
+                        borderDash: [5, 5],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw)
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Dia do Mês', font: { size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => fmtNum(v) }
+                    }
+                }
+            }
+        });
+
+        // ===== LINE CHART — MANUAL LINE MONTHLY TREND =====
+        const manualMes = data.manual_mes || [];
+        const manLabels = manualMes.map(d => d.data.substring(8));
+        const manFin = manualMes.map(d => d.finalizados || 0);
+        const manMetas = manualMes.map(d => {
+            const m = metasPorDia[d.data];
+            return m ? m.manual : metaManual;
+        });
+
+        new Chart(document.getElementById('chartTendenciaManual'), {
+            type: 'line',
+            data: {
+                labels: manLabels,
+                datasets: [
+                    {
+                        label: 'Finalizados',
+                        data: manFin,
+                        borderColor: '#0dcaf0',
+                        backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: manFin.map(v => v >= metaManual ? '#198754' : '#dc3545'),
+                    },
+                    {
+                        label: 'Meta Diária',
+                        data: manMetas,
+                        borderColor: '#dc3545',
+                        borderDash: [5, 5],
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw)
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Dia do Mês', font: { size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { callback: v => fmtNum(v) }
+                    }
+                }
+            }
+        });
+    })
+    .catch(err => console.warn('Trend chart error:', err));
+
+// ===== BAR CHART — ABSENTEEISM WEEK =====
+const absLabels = absSemana.map(d => d.dia_semana);
+const absTaxas = absSemana.map(d => d.taxa_geral);
+
+new Chart(document.getElementById('chartAbsenteismo'), {
+    type: 'bar',
+    data: {
+        labels: absLabels,
+        datasets: [{
+            label: 'Absenteísmo %',
+            data: absTaxas,
+            backgroundColor: absTaxas.map(v => v > 5 ? 'rgba(220, 53, 69, 0.7)' : (v > 2 ? 'rgba(255, 193, 7, 0.7)' : 'rgba(25, 135, 84, 0.7)')),
+            borderRadius: 4,
+            barPercentage: 0.6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: ctx => ctx.raw.toFixed(1) + '%'
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 20,
+                ticks: { callback: v => v + '%' }
+            }
+        }
+    }
+});
+
+
+
+// ===== AUTO-REFRESH =====
+const REFRESH_MS = {{ auto_refresh }} * 1000;
+setTimeout(() => location.reload(), REFRESH_MS);
+</script>
+{% endblock %}
