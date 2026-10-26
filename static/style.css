@@ -1,0 +1,327 @@
+/* ===== Dashboard Diretoria — Custom Styles ===== */
+
+:root {
+    --primary-dark: #1F4E78;
+    --primary-light: #D9EAF7;
+    --success-light: #E2F0D9;
+    --danger-light: #FDDEDE;
+    --warning-light: #FFF2CC;
+    --bg-body: #f4f6f9;
+}
+
+body {
+    background-color: var(--bg-body);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== NAVBAR ===== */
+.topbar {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #2a6fa8 100%);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.navbar-brand {
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
+
+/* ===== KPI CARDS ===== */
+.kpi-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+.kpi-number {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary-dark);
+    line-height: 1.1;
+}
+
+.kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6c757d;
+    font-weight: 600;
+}
+
+.kpi-icon {
+    opacity: 0.8;
+}
+
+/* Safe / Alert states */
+.kpi-safe {
+    background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%) !important;
+}
+
+.kpi-safe .kpi-number {
+    color: #198754;
+}
+
+.kpi-alert {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%) !important;
+}
+
+.kpi-alert .kpi-number {
+    color: #856404;
+}
+
+/* ===== CARDS ===== */
+.card {
+    border-radius: 12px;
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+    padding: 0.75rem 1rem;
+}
+
+/* ===== GAUGE ===== */
+.gauge-container {
+    position: relative;
+    width: 150px;
+    height: 150px;
+}
+
+/* ===== TABLES ===== */
+.table th {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* ===== BADGES ===== */
+.badge {
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+/* ===== FOOTER ===== */
+.footer {
+    margin-top: auto;
+    border-top: 1px solid #dee2e6;
+}
+
+/* ===== TEXT COLORS ===== */
+.text-primary-dark {
+    color: var(--primary-dark) !important;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .kpi-number {
+        font-size: 1.5rem;
+    }
+
+    .kpi-label {
+        font-size: 0.65rem;
+    }
+
+    .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .gauge-container {
+        width: 100px;
+        height: 100px;
+    }
+
+    .gauge-container canvas {
+        width: 100px !important;
+        height: 100px !important;
+    }
+
+    .card-header h6, .card-header span {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .kpi-number {
+        font-size: 1.3rem;
+    }
+
+    .navbar-brand span.fw-bold {
+        font-size: 0.85rem;
+    }
+
+    .navbar-brand .badge {
+        display: none;
+    }
+}
+
+/* ===== PRINT ===== */
+@media print {
+    .topbar, .footer, .btn {
+        display: none !important;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+    }
+
+    body {
+        background: white;
+    }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.4s ease-out;
+}
+
+.row > [class*="col-"]:nth-child(2) .card { animation-delay: 0.1s; }
+.row > [class*="col-"]:nth-child(3) .card { animation-delay: 0.2s; }
+.row > [class*="col-"]:nth-child(4) .card { animation-delay: 0.3s; }
+
+/* ===== DARK MODE ===== */
+[data-theme="dark"] {
+    --bg-body: #1a1d23;
+    --primary-dark: #6db3f2;
+    --primary-light: #2a3040;
+    --success-light: #1a2e1a;
+    --danger-light: #2e1a1a;
+    --warning-light: #2e2a1a;
+}
+
+[data-theme="dark"] body {
+    background-color: #1a1d23;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .topbar {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+}
+
+[data-theme="dark"] .card {
+    background-color: #21262d !important;
+    border-color: #30363d !important;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .card-header {
+    background-color: #161b22 !important;
+    border-color: #30363d !important;
+    color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] .kpi-number {
+    color: #6db3f2;
+}
+
+[data-theme="dark"] .kpi-safe {
+    background: linear-gradient(135deg, #1a2e1a 0%, #1f3320 100%) !important;
+}
+
+[data-theme="dark"] .kpi-safe .kpi-number {
+    color: #4caf50;
+}
+
+[data-theme="dark"] .kpi-alert {
+    background: linear-gradient(135deg, #2e2a1a 0%, #33301f 100%) !important;
+}
+
+[data-theme="dark"] .kpi-alert .kpi-number {
+    color: #ffca28;
+}
+
+[data-theme="dark"] .text-muted {
+    color: #8b949e !important;
+}
+
+[data-theme="dark"] .text-dark {
+    color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] .kpi-label {
+    color: #8b949e;
+}
+
+[data-theme="dark"] .table {
+    color: #e0e0e0;
+    --bs-table-bg: #21262d;
+    --bs-table-striped-bg: #272c35;
+    --bs-table-hover-bg: #2d333b;
+    --bs-table-border-color: #30363d;
+}
+
+[data-theme="dark"] .table th {
+    color: #8b949e;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .table td {
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .table-success { --bs-table-bg: #1a2e1a; color: #4caf50; }
+[data-theme="dark"] .table-danger { --bs-table-bg: #2e1a1a; color: #ef5350; }
+[data-theme="dark"] .table-warning { --bs-table-bg: #2e2a1a; color: #ffca28; }
+
+[data-theme="dark"] .footer {
+    background-color: #161b22 !important;
+    border-color: #30363d !important;
+    color: #8b949e;
+}
+
+[data-theme="dark"] .bg-light {
+    background-color: #21262d !important;
+}
+
+[data-theme="dark"] .border {
+    border-color: #30363d !important;
+}
+
+[data-theme="dark"] .form-control {
+    background-color: #21262d;
+    border-color: #30363d;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .btn-outline-secondary {
+    color: #8b949e;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .btn-outline-secondary:hover {
+    background-color: #30363d;
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .alert-warning {
+    background-color: #2e2a1a;
+    border-color: #44400f;
+    color: #ffca28;
+}
+
+[data-theme="dark"] .progress {
+    background-color: #30363d;
+}
+
+[data-theme="dark"] .badge.bg-light {
+    background-color: #30363d !important;
+    color: #e0e0e0 !important;
+}
