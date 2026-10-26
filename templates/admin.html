@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Admin — Dashboard Diretoria{% endblock %}
+
+{% block content %}
+
+<h4 class="text-primary-dark mb-4">
+    <i class="bi bi-gear-fill me-2"></i>Painel Administrativo
+</h4>
+
+{# ===== ENVASE MANUAL — WhatsApp Paste ===== #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-info bg-opacity-10 border-0">
+        <h6 class="mb-0"><i class="bi bi-whatsapp me-2 text-success"></i>Envase Manual — Colar Mensagem do WhatsApp</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-7">
+                <form method="POST">
+                    <input type="hidden" name="form_type" value="envase_manual">
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Data da Produção</label>
+                            <input type="date" class="form-control" name="data" value="{{ hoje }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Mensagem do WhatsApp</label>
+                            <textarea class="form-control font-monospace" name="mensagem" rows="12"
+                                placeholder="Cole aqui a mensagem do WhatsApp...
+
+Exemplo:
+Envase Manual-
+
+My soul breeze L.1201/26:
+Envasados: 1.576 unidades
+Finalizados: 2.466 unidades
+
+Velvet 30 ml L.1234/26:
+Finalizados: 2.175 unidades
+
+Total envasados: 3.093 unidades
+Total finalizados: 4.641 unidades" id="msgInput"></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-info text-white flex-grow-1">
+                                    <i class="bi bi-lightning me-1"></i>Processar Mensagem
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleManualInput()">
+                                    <i class="bi bi-pencil me-1"></i>Input Manual
+                                </button>
+                            </div>
+                        </div>
+
+                        {# Manual input fallback (hidden by default) #}
+                        <div id="manualInputFields" style="display:none" class="col-12">
+                            <hr>
+                            <p class="text-muted small mb-2">Ou insira os totais manualmente:</p>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small">Total Envasados</label>
+                                    <input type="number" class="form-control" name="total_envasados" min="0" value="0">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">Total Finalizados</label>
+                                    <input type="number" class="form-control" name="total_finalizados" min="0" value="0">
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-outline-info w-100">
+                                        <i class="bi bi-save me-1"></i>Salvar Totais
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            {# Today's parsed data #}
+            <div class="col-lg-5">
+                <div class="border rounded p-3 bg-light h-100">
+                    <h6 class="text-muted mb-3">
+                        <i class="bi bi-clipboard-data me-1"></i>Dados de Hoje
+                    </h6>
+
+                    {% if manual_hoje.envasados > 0 or manual_hoje.finalizados > 0 %}
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="fs-4 fw-bold text-info">{{ manual_hoje.envasados|fmt }}</div>
+                            <small class="text-muted">Envasados</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="fs-4 fw-bold text-secondary">{{ manual_hoje.finalizados|fmt }}</div>
+                            <small class="text-muted">Finalizados</small>
+                        </div>
+                    </div>
+
+                    {% if manual_produtos_hoje %}
+                    <table class="table table-sm small mb-2">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Lote</th>
+                                <th class="text-end">Env.</th>
+                                <th class="text-end">Fin.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in manual_produtos_hoje %}
+                            <tr>
+                                <td>{{ p.produto }}</td>
+                                <td><span class="badge bg-secondary">{{ p.lote }}</span></td>
+                                <td class="text-end">{{ p.envasados|fmt }}</td>
+                                <td class="text-end">{{ p.finalizados|fmt }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('delete_manual', data=hoje) }}" class="mt-2">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100"
+                                onclick="return confirm('Excluir registros de envase manual de hoje?')">
+                            <i class="bi bi-trash me-1"></i>Excluir registros de hoje
+                        </button>
+                    </form>
+
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                        <p class="mb-0">Nenhum registro de hoje.</p>
+                        <small>Cole a mensagem do WhatsApp ao lado.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    {# ===== ABSENTEEISM FORM ===== #}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-warning bg-opacity-10 border-0">
+                <h6 class="mb-0">
+                    <i class="bi bi-people me-2"></i>Registrar Absenteísmo
+                    <span class="badge bg-primary ms-2">Turno: {{ turno_hoje }}</span>
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="form_type" value="absenteismo">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Data</label>
+                            <input type="date" class="form-control" name="data" value="{{ hoje }}" required
+                                   id="absDate" onchange="updateTurno()">
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="w-100">
+                                <label class="form-label">Turno (automático)</label>
+                                <div class="form-control bg-light" id="turnoDisplay">
+                                    <i class="bi bi-person-badge me-1"></i><strong>{{ turno_hoje }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total no Turno</label>
+                            <input type="number" class="form-control" name="total_turno" min="0" required
+                                   placeholder="Quantas pessoas no turno">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ausentes</label>
+                            <input type="number" class="form-control" name="ausentes" min="0" required
+                                   placeholder="Quantos faltaram">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observação</label>
+                            <input type="text" class="form-control" name="observacao" placeholder="Ex: 2 atestados, 1 falta injustificada">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-warning w-100">
+                                <i class="bi bi-save me-1"></i>Registrar Absenteísmo
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if absenteismo.registros %}
+                <hr>
+                <h6 class="text-muted small">Registros de hoje:</h6>
+                <table class="table table-sm small">
+                    <thead>
+                        <tr>
+                            <th>Turno</th>
+                            <th>Total</th>
+                            <th>Presentes</th>
+                            <th>Ausentes</th>
+                            <th>Taxa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in absenteismo.registros %}
+                        <tr>
+                            <td><span class="badge bg-primary">{{ r.setor }}</span></td>
+                            <td>{{ r.funcionarios_previstos }}</td>
+                            <td>{{ r.funcionarios_presentes }}</td>
+                            <td class="text-danger fw-bold">{{ r.funcionarios_previstos - r.funcionarios_presentes }}</td>
+                            <td>
+                                {% if r.funcionarios_previstos > 0 %}
+                                    {{ "%.1f"|format(((r.funcionarios_previstos - r.funcionarios_presentes) / r.funcionarios_previstos) * 100) }}%
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ===== ACCIDENT FORM ===== #}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-danger bg-opacity-10 border-0">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Registrar Acidente</h6>
+            </div>
+            <div class="card-body">
+                {# Current status #}
+                <div class="alert {{ 'alert-success' if seguranca.dias >= 30 else 'alert-warning' }} text-center mb-3">
+                    <h3 class="mb-0">🛡️ {{ seguranca.dias }} dias sem acidente</h3>
+                    <small>Desde {{ seguranca.data_ultimo_acidente }}</small>
+                </div>
+
+                <form method="POST">
+                    <input type="hidden" name="form_type" value="acidente">
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Data do Acidente</label>
+                            <input type="date" class="form-control" name="data_acidente" value="{{ hoje }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Gravidade</label>
+                            <select class="form-select" name="gravidade">
+                                <option value="leve">Leve</option>
+                                <option value="moderado">Moderado</option>
+                                <option value="grave">Grave</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Descrição</label>
+                            <textarea class="form-control" name="descricao" rows="2" placeholder="Descreva brevemente o ocorrido"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Tem certeza? Isso irá resetar o contador de dias sem acidente.')">
+                                <i class="bi bi-exclamation-triangle me-1"></i>Registrar Acidente
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if historico_acidentes %}
+                <hr>
+                <h6 class="text-muted small">Histórico de acidentes:</h6>
+                <table class="table table-sm small">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Gravidade</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in historico_acidentes %}
+                        <tr>
+                            <td>{{ a.data }}</td>
+                            <td>
+                                <span class="badge {{ 'bg-success' if a.gravidade == 'leve' else ('bg-warning text-dark' if a.gravidade == 'moderado' else 'bg-danger') }}">
+                                    {{ a.gravidade }}
+                                </span>
+                            </td>
+                            <td>{{ a.descricao or '—' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ===== METAS POR PERIODO ===== #}
+<div class="row g-4 mt-1">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-success bg-opacity-10 border-0">
+                <h6 class="mb-0"><i class="bi bi-bullseye me-2"></i>Metas por Período ({{ ano_atual }})</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="form_type" value="metas_periodo">
+                    <input type="hidden" name="ano" value="{{ ano_atual }}">
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle text-center">
+                            <thead>
+                                <tr>
+                                    <th>Mês</th>
+                                    <th>Meta Automática</th>
+                                    <th>Meta Manual</th>
+                                    <th>Meta Sleeve</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'] %}
+                                {% for m in range(1, 13) %}
+                                <tr>
+                                    <td class="fw-bold">{{ meses[m-1] }}</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm mx-auto" style="max-width: 150px;" name="meta_auto_{{ m }}" value="{{ metas_ano[m-1].auto }}" required>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm mx-auto" style="max-width: 150px;" name="meta_manual_{{ m }}" value="{{ metas_ano[m-1].manual }}" required>
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm mx-auto" style="max-width: 150px;" name="meta_sleeve_{{ m }}" value="{{ metas_ano[m-1].sleeve }}" required>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save me-1"></i>Salvar Metas
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 text-center">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+        <i class="bi bi-arrow-left me-1"></i>Voltar ao Dashboard
+    </a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleManualInput() {
+    const el = document.getElementById('manualInputFields');
+    const msg = document.getElementById('msgInput');
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        msg.required = false;
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+function updateTurno() {
+    // Reference: 30/09/2026 = Caio. Alternates daily.
+    const ref = new Date('2026-09-30T12:00:00');
+    const selected = new Date(document.getElementById('absDate').value + 'T12:00:00');
+    const diffDays = Math.round(Math.abs((selected - ref) / 86400000));
+    const turno = diffDays % 2 === 0 ? 'Caio' : 'Douglas';
+    document.getElementById('turnoDisplay').innerHTML =
+        '<i class="bi bi-person-badge me-1"></i><strong>' + turno + '</strong>';
+}
+</script>
+{% endblock %}
