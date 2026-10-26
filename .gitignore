@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Excel files (large, not needed in cloud)
+*.xlsx
+~$*
+
+# Utility/debug scripts
+add_absenteismo.py
+build_consolidado.py
+check_api.py
+check_cols.py
+debug_excel.py
+debug_month.py
+debug_oct.py
+delete_record.py
+fix_consolidado.py
+fix_date.py
+list_manual.py
+setup_acidente.py
+set_meta.py
+test_obs.py
+test_parser.py
+unify_manual.py
+
+# Deploy configs for other platforms
+.railwayignore
+render.yaml
+Procfile
+wsgi.py
+Dockerfile
+DEPLOY_PYTHONANYWHERE.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
