@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Mensal - {{ mes_nome }} {{ data_ref.year }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            color: #0056b3;
+            font-size: 24px;
+        }
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            background-color: #f4f4f4;
+            padding: 8px 10px;
+            border-left: 4px solid #0056b3;
+            font-size: 16px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .kpi-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            flex: 1;
+            min-width: 150px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            text-align: center;
+            background-color: #fff;
+        }
+        .kpi-title {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .kpi-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        .kpi-subtitle {
+            font-size: 11px;
+            color: #999;
+            margin-top: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        
+        @media print {
+            body { padding: 0; }
+            .kpi-card { border: 1px solid #000; }
+            th, td { border: 1px solid #000; }
+            .section-title { background-color: #eee !important; -webkit-print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Relatório de Produção</h1>
+        <p>Referência: {{ mes_nome }} {{ data_ref.year }}</p>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Resumo do Mês</h2>
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <div class="kpi-title">Dias sem Acidente</div>
+                <div class="kpi-value">{{ seguranca.dias }}</div>
+                <div class="kpi-subtitle">Desde {{ seguranca.data_ultimo_acidente }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Linha Automática (Total)</div>
+                <div class="kpi-value">{{ auto_resumo_mes.total_producao|fmt }}</div>
+                <div class="kpi-subtitle">Média: {{ (auto_resumo_mes.total_producao / auto_resumo_mes.dias_trabalhados)|int|fmt if auto_resumo_mes.dias_trabalhados > 0 else 0 }}/dia</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Linha Manual (Finalizados)</div>
+                <div class="kpi-value">{{ manual_resumo_mes.total_finalizados|fmt }}</div>
+                <div class="kpi-subtitle">Envasados: {{ manual_resumo_mes.total_envasados|fmt }}</div>
+            </div>
+        </div>
+        <p style="font-size: 12px; margin-top: 10px;">
+            <strong>Metas do Período:</strong> Linha Automática: {{ meta_auto|fmt }} und/dia | Linha Manual: {{ meta_manual|fmt }} und/dia
+        </p>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title">Histórico de Produção - Linha Automática</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Dia</th>
+                    <th>Turno</th>
+                    <th>Produção</th>
+                    <th>Meta Diária</th>
+                    <th>Status</th>
+                    <th>Presentes</th>
+                    <th>Prod/Pessoa</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in historico_completo %}
+                <tr>
+                    <td>{{ d.data[8:10] }}/{{ d.data[5:7] }}/{{ d.data[0:4] }}</td>
+                    <td>{{ d.dia_semana }}</td>
+                    <td>{{ d.turno }}</td>
+                    <td style="font-weight: bold; color: {{ '#28a745' if d.producao >= meta_auto else ('#dc3545' if d.producao > 0 else '#6c757d') }}">
+                        {{ d.producao|fmt if d.producao > 0 else '-' }}
+                    </td>
+                    <td>{{ meta_auto|fmt }}</td>
+                    <td>
+                        {% if d.producao >= meta_auto %}
+                            Atingida
+                        {% elif d.producao > 0 %}
+                            Abaixo
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ d.presentes if d.presentes > 0 else '-' }}</td>
+                    <td>
+                        {% if d.producao > 0 and d.presentes > 0 %}
+                            {{ (d.producao / d.presentes)|round(1) }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; font-size: 10px; color: #999;">
+        <p>Gerado pelo Dashboard da Diretoria - {{ data_ref.strftime('%d/%m/%Y %H:%M') }}</p>
+        <p>Imprima este documento em formato A4, de preferência em modo Retrato.</p>
+    </div>
+
+</body>
+</html>
