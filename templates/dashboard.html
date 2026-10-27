@@ -643,7 +643,7 @@ function navigateDay(offset) {
                         </thead>
                         <tbody>
                             {% for d in historico_completo %}
-                            {% if d.sleeve > 0 or d.sleeve_meta > 0 %}
+                            {% if true %}
                             <tr>
                                 <td class="text-start ps-3 fw-bold">{{ d.dia_semana }}</td>
                                 <td>{{ d.data[8:] }}/{{ d.data[5:7] }}</td>
