@@ -209,7 +209,9 @@ def get_dados_dia(data=None):
         data = datetime.strptime(data, '%Y-%m-%d').date()
 
     data_str = data.strftime('%Y-%m-%d')
-    meta = META_LINHA_AUTOMATICA
+    from config import get_meta_periodo
+    m = get_meta_periodo(data.year, data.month, data_str=data_str)
+    meta = m['auto']
 
     # Check database first
     try:
@@ -312,15 +314,18 @@ def get_dados_mes(ano=None, mes=None):
         ).fetchall()
         conn.close()
         if rows:
+            from config import get_meta_periodo
             result = []
             for row in rows:
                 producao = row['producao'] or 0
                 if producao == 0:
                     continue
-                meta = META_LINHA_AUTOMATICA
+                data_str = row['data']
+                m = get_meta_periodo(ano, mes, data_str=data_str)
+                meta = m['auto']
                 eficiencia = (producao / meta * 100) if meta > 0 else 0
                 result.append({
-                    'data': row['data'],
+                    'data': data_str,
                     'producao': producao,
                     'embalagem': row['embalagem'] or 0,
                     'sleeve': row['sleeve'] or 0,
@@ -344,11 +349,14 @@ def get_dados_mes(ano=None, mes=None):
     result = []
     for _, r in df_mes.iterrows():
         producao = int(r['producao'])
-        meta = META_LINHA_AUTOMATICA
+        data_str = r['data'].strftime('%Y-%m-%d')
+        from config import get_meta_periodo
+        m = get_meta_periodo(ano, mes, data_str=data_str)
+        meta = m['auto']
         eficiencia = (producao / meta * 100) if meta > 0 else 0
 
         result.append({
-            'data': r['data'].strftime('%Y-%m-%d'),
+            'data': data_str,
             'producao': producao,
             'embalagem': int(r['embalagem']),
             'sleeve': int(r['sleeve']),
@@ -371,7 +379,7 @@ def get_resumo_mes(ano=None, mes=None):
 
     total_prod = sum(d['producao'] for d in dados)
     dias = len([d for d in dados if d['producao'] > 0])
-    total_meta = dias * META_LINHA_AUTOMATICA
+    total_meta = sum(d['meta'] for d in dados if d['producao'] > 0)
     eficiencia = (total_prod / total_meta * 100) if total_meta > 0 else 0
 
     dados_com_prod = [d for d in dados if d['producao'] > 0]
