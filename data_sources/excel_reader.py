@@ -221,7 +221,7 @@ def get_dados_dia(data=None):
         conn.close()
         if row and (row['producao'] or 0) > 0:
             producao = row['producao'] or 0
-            eficiencia = (producao / meta * 100) if meta > 0 else 0
+            eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
             return {
                 'data': data_str,
                 'producao': producao,
@@ -255,7 +255,7 @@ def get_dados_dia(data=None):
 
     r = row.iloc[0]
     producao = int(r['producao'])
-    eficiencia = (producao / meta * 100) if meta > 0 else 0
+    eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
 
     return {
         'data': data_str,
@@ -323,7 +323,7 @@ def get_dados_mes(ano=None, mes=None):
                 data_str = row['data']
                 m = get_meta_periodo(ano, mes, data_str=data_str)
                 meta = m['auto']
-                eficiencia = (producao / meta * 100) if meta > 0 else 0
+                eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
                 result.append({
                     'data': data_str,
                     'producao': producao,
@@ -353,7 +353,7 @@ def get_dados_mes(ano=None, mes=None):
         from config import get_meta_periodo
         m = get_meta_periodo(ano, mes, data_str=data_str)
         meta = m['auto']
-        eficiencia = (producao / meta * 100) if meta > 0 else 0
+        eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
 
         result.append({
             'data': data_str,
@@ -380,7 +380,7 @@ def get_resumo_mes(ano=None, mes=None):
     total_prod = sum(d['producao'] for d in dados)
     dias = len([d for d in dados if d['producao'] > 0])
     total_meta = sum(d['meta'] for d in dados if d['producao'] > 0)
-    eficiencia = (total_prod / total_meta * 100) if total_meta > 0 else 0
+    eficiencia = ((total_prod - total_meta) / total_meta * 100) if total_meta > 0 else 0
 
     dados_com_prod = [d for d in dados if d['producao'] > 0]
     melhor = max(dados_com_prod, key=lambda x: x['producao']) if dados_com_prod else None
