@@ -190,7 +190,7 @@ def dashboard():
         d_meta = get_meta_periodo(int(dt_str[:4]), int(dt_str[5:7]), data_str=dt_str)
         sleeve_meta = d_meta.get('sleeve', 0)
         sleeve_val = d['sleeve']
-        sleeve_efi = round(sleeve_val / sleeve_meta * 100, 1) if sleeve_meta > 0 and sleeve_val > 0 else 0
+        sleeve_efi = round((sleeve_val - sleeve_meta) / sleeve_meta * 100, 1) if sleeve_meta > 0 and sleeve_val > 0 else 0
 
         # Get Sleeve observation if below meta
         sleeve_obs = ''
