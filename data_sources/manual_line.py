@@ -381,7 +381,7 @@ def get_dados_dia(data=None):
     from config import get_meta_periodo
     d_meta = get_meta_periodo(int(data[:4]), int(data[5:7]), data_str=data)
     meta = d_meta['manual']
-    eficiencia = (finalizados / meta * 100) if meta > 0 else 0
+    eficiencia = ((finalizados - meta) / meta * 100) if meta > 0 else 0
 
     return {
         'data': data,
@@ -446,7 +446,7 @@ def get_dados_mes(ano=None, mes=None):
         d_str = row['data']
         d_meta = get_meta_periodo(int(d_str[:4]), int(d_str[5:7]), data_str=d_str)
         meta = d_meta['manual']
-        eficiencia = (fin / meta * 100) if meta > 0 else 0
+        eficiencia = ((fin - meta) / meta * 100) if meta > 0 else 0
 
         result.append({
             'data': d_str,
@@ -473,7 +473,7 @@ def get_resumo_mes(ano=None, mes=None):
     total_fin = sum(d['finalizados'] for d in dados)
     dias = len([d for d in dados if d['envasados'] > 0 or d['finalizados'] > 0])
     total_meta = sum(d['meta'] for d in dados if d['envasados'] > 0 or d['finalizados'] > 0)
-    eficiencia = (total_fin / total_meta * 100) if total_meta > 0 else 0
+    eficiencia = ((total_fin - total_meta) / total_meta * 100) if total_meta > 0 else 0
 
     return {
         'total_envasados': total_env,
