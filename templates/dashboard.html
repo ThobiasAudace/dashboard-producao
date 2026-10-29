@@ -578,7 +578,7 @@ function navigateDay(offset) {
                                 <td>
                                     {% set efi = d.eficiencia %}
                                     {% if d.producao > 0 %}
-                                        <span class="badge {{ 'bg-success' if efi >= 100 else ('bg-warning text-dark' if efi >= 80 else 'bg-danger') }}">
+                                        <span class="badge {{ 'bg-success' if efi >= 0 else 'bg-danger' }}">
                                             {{ "%.1f"|format(efi) }}%
                                         </span>
                                     {% else %}
@@ -663,7 +663,7 @@ function navigateDay(offset) {
                                 <td>
                                     {% if d.sleeve > 0 and d.sleeve_meta > 0 %}
                                         {% set sefi = d.sleeve_eficiencia %}
-                                        <span class="badge {{ 'bg-success' if sefi >= 100 else ('bg-warning text-dark' if sefi >= 80 else 'bg-danger') }}">
+                                        <span class="badge {{ 'bg-success' if sefi >= 0 else 'bg-danger' }}">
                                             {{ "%.1f"|format(sefi) }}%
                                         </span>
                                     {% else %}
@@ -841,7 +841,7 @@ function navigateDay(offset) {
                                 <td>
                                     {% set efi = d.eficiencia %}
                                     {% if d.envasados > 0 %}
-                                        <span class="badge {{ 'bg-success' if efi >= 100 else ('bg-warning text-dark' if efi >= 80 else 'bg-danger') }}">
+                                        <span class="badge {{ 'bg-success' if efi >= 0 else 'bg-danger' }}">
                                             {{ "%.1f"|format(efi) }}%
                                         </span>
                                     {% else %}
@@ -948,7 +948,7 @@ function navigateDay(offset) {
                         <small class="text-muted">Meta Total</small>
                     </div>
                     <div class="col-4">
-                        <div class="fs-5 fw-bold {{ 'text-success' if auto_resumo_mes.eficiencia_media >= 100 else ('text-warning' if auto_resumo_mes.eficiencia_media >= 80 else 'text-danger') }}">
+                        <div class="fs-5 fw-bold {{ 'text-success' if auto_resumo_mes.eficiencia_media >= 0 else 'text-danger' }}">
                             {{ auto_resumo_mes.eficiencia_media }}%
                         </div>
                         <small class="text-muted">Eficiência Média</small>
@@ -973,7 +973,7 @@ function navigateDay(offset) {
                         <small class="text-muted">Meta Total</small>
                     </div>
                     <div class="col-4">
-                        <div class="fs-5 fw-bold {{ 'text-success' if manual_resumo_mes.eficiencia_media >= 100 else ('text-warning' if manual_resumo_mes.eficiencia_media >= 80 else 'text-danger') }}">
+                        <div class="fs-5 fw-bold {{ 'text-success' if manual_resumo_mes.eficiencia_media >= 0 else 'text-danger' }}">
                             {{ manual_resumo_mes.eficiencia_media }}%
                         </div>
                         <small class="text-muted">Eficiência Média</small>
