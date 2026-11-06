@@ -946,6 +946,17 @@ function navigateDay(offset) {
                     <div class="col-4">
                         <div class="fs-5 fw-bold text-secondary">{{ auto_resumo_mes.total_meta|fmt }}</div>
                         <small class="text-muted">Meta Total</small>
+                        {% if auto_resumo_mes_anterior and auto_resumo_mes_anterior.total_meta > 0 %}
+                        <br>
+                        {% set diff_meta_auto = auto_resumo_mes.total_meta - auto_resumo_mes_anterior.total_meta %}
+                        {% set pct_meta_auto = ((diff_meta_auto / auto_resumo_mes_anterior.total_meta) * 100)|round(1) %}
+                        <small class="{{ 'text-success' if diff_meta_auto >= 0 else 'text-danger' }}">
+                            <i class="bi bi-{{ 'arrow-up' if diff_meta_auto >= 0 else 'arrow-down' }}"></i>
+                            {{ pct_meta_auto }}% vs {{ prev_month_name }}
+                        </small>
+                        {% elif auto_resumo_mes_anterior %}
+                        <br><small class="text-muted">{{ prev_month_name }}: {{ auto_resumo_mes_anterior.total_meta|fmt }}</small>
+                        {% endif %}
                     </div>
                     <div class="col-4">
                         <div class="fs-5 fw-bold {{ 'text-success' if auto_resumo_mes.eficiencia_media >= 0 else 'text-danger' }}">
@@ -954,6 +965,15 @@ function navigateDay(offset) {
                         <small class="text-muted">Eficiência Média</small>
                     </div>
                 </div>
+                {% if auto_resumo_mes.data_atingiu_meta %}
+                <div class="text-center mt-2">
+                    <small class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida em <strong>{{ auto_resumo_mes.data_atingiu_meta[8:] }}/{{ auto_resumo_mes.data_atingiu_meta[5:7] }}</strong></small>
+                </div>
+                {% elif auto_resumo_mes.total_producao > 0 %}
+                <div class="text-center mt-2">
+                    <small class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Meta ainda não atingida</small>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -971,6 +991,17 @@ function navigateDay(offset) {
                     <div class="col-4">
                         <div class="fs-5 fw-bold text-secondary">{{ manual_resumo_mes.total_meta|fmt }}</div>
                         <small class="text-muted">Meta Total</small>
+                        {% if manual_resumo_mes_anterior and manual_resumo_mes_anterior.total_meta > 0 %}
+                        <br>
+                        {% set diff_meta_manual = manual_resumo_mes.total_meta - manual_resumo_mes_anterior.total_meta %}
+                        {% set pct_meta_manual = ((diff_meta_manual / manual_resumo_mes_anterior.total_meta) * 100)|round(1) %}
+                        <small class="{{ 'text-success' if diff_meta_manual >= 0 else 'text-danger' }}">
+                            <i class="bi bi-{{ 'arrow-up' if diff_meta_manual >= 0 else 'arrow-down' }}"></i>
+                            {{ pct_meta_manual }}% vs {{ prev_month_name }}
+                        </small>
+                        {% elif manual_resumo_mes_anterior %}
+                        <br><small class="text-muted">{{ prev_month_name }}: {{ manual_resumo_mes_anterior.total_meta|fmt }}</small>
+                        {% endif %}
                     </div>
                     <div class="col-4">
                         <div class="fs-5 fw-bold {{ 'text-success' if manual_resumo_mes.eficiencia_media >= 0 else 'text-danger' }}">
@@ -979,6 +1010,15 @@ function navigateDay(offset) {
                         <small class="text-muted">Eficiência Média</small>
                     </div>
                 </div>
+                {% if manual_resumo_mes.data_atingiu_meta %}
+                <div class="text-center mt-2">
+                    <small class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Meta atingida em <strong>{{ manual_resumo_mes.data_atingiu_meta[8:] }}/{{ manual_resumo_mes.data_atingiu_meta[5:7] }}</strong></small>
+                </div>
+                {% elif manual_resumo_mes.total_finalizados > 0 %}
+                <div class="text-center mt-2">
+                    <small class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Meta ainda não atingida</small>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -1060,22 +1100,44 @@ const absSemana = {{ absenteismo_semana | tojson }};
 const metaAuto = {{ meta_auto }};
 const metaManual = {{ meta_manual }};
 const metasPorDia = {{ metas_por_dia | tojson }};
-const efiAuto = {{ auto_hoje.eficiencia }};
-const efiManual = {{ manual_hoje.eficiencia }};
 
 // ===== UTILITY =====
 function fmtNum(n) {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
+// Calculate period efficiency from array of daily data
+function calcPeriodEfi(data, type) {
+    let totalProd = 0, totalMeta = 0;
+    data.forEach(d => {
+        if (type === 'auto') {
+            if (d.producao > 0) {
+                totalProd += d.producao;
+                totalMeta += (d.meta_dia !== undefined && d.meta_dia !== null ? d.meta_dia : metaAuto);
+            }
+        } else {
+            if (d.finalizados > 0) {
+                totalProd += d.finalizados;
+                totalMeta += (d.meta_dia !== undefined && d.meta_dia !== null ? d.meta_dia : metaManual);
+            }
+        }
+    });
+    if (totalMeta === 0 || totalProd === 0) return 0;
+    return ((totalProd - totalMeta) / totalMeta * 100);
+}
+
 // ===== GAUGE CHART =====
+let gaugeAutoChart = null;
+let gaugeManualChart = null;
+
 function createGauge(canvasId, value, maxValue) {
-    const pct = Math.min(value, 150);  // cap at 150%
-    let color = pct >= 100 ? '#198754' : (pct >= 80 ? '#ffc107' : '#dc3545');
+    const pct = Math.max(0, Math.min(value + 100, 150));  // shift: 0% diff = 100 on gauge
+    let color = value >= 0 ? '#198754' : '#dc3545';
 
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
 
-    new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'doughnut',
         data: {
             datasets: [{
@@ -1104,7 +1166,7 @@ function createGauge(canvasId, value, maxValue) {
                 ctx.font = 'bold 22px Arial';
                 ctx.fillStyle = color;
                 ctx.textAlign = 'center';
-                ctx.fillText(value.toFixed(1) + '%', cx, cy);
+                ctx.fillText((value >= 0 ? '+' : '') + value.toFixed(1) + '%', cx, cy);
                 ctx.font = '11px Arial';
                 ctx.fillStyle = '#6c757d';
                 ctx.fillText('eficiência', cx, cy + 18);
@@ -1112,10 +1174,23 @@ function createGauge(canvasId, value, maxValue) {
             }
         }]
     });
+    return chart;
 }
 
-createGauge('gaugeAuto', efiAuto, 150);
-createGauge('gaugeManual', efiManual, 150);
+function updateGauge(type, data) {
+    const efi = calcPeriodEfi(data, type);
+    if (type === 'auto') {
+        if (gaugeAutoChart) gaugeAutoChart.destroy();
+        gaugeAutoChart = createGauge('gaugeAuto', efi, 150);
+    } else {
+        if (gaugeManualChart) gaugeManualChart.destroy();
+        gaugeManualChart = createGauge('gaugeManual', efi, 150);
+    }
+}
+
+// Initial gauge with 7-day period data
+gaugeAutoChart = createGauge('gaugeAuto', calcPeriodEfi(autoSemana, 'auto'), 150);
+gaugeManualChart = createGauge('gaugeManual', calcPeriodEfi(manualSemana, 'manual'), 150);
 
 // ===== WEEKLY CHARTS (reusable) =====
 let chartAutoSemana = null;
@@ -1124,7 +1199,7 @@ let chartManualSemana = null;
 function renderAutoSemana(data) {
     const labels = data.map(d => d.data ? d.data.substring(8) + '/' + d.data.substring(5,7) : d.dia_semana);
     const prods = data.map(d => d.producao);
-    const metas = data.map(d => d.meta_dia || metaAuto);
+    const metas = data.map(d => d.meta_dia !== undefined && d.meta_dia !== null ? d.meta_dia : metaAuto);
 
     if (chartAutoSemana) chartAutoSemana.destroy();
     chartAutoSemana = new Chart(document.getElementById('chartAutoSemana'), {
@@ -1170,7 +1245,7 @@ function renderManualSemana(data) {
     const labels = data.map(d => d.data ? d.data.substring(8) + '/' + d.data.substring(5,7) : d.dia_semana);
     const envs = data.map(d => d.envasados);
     const fins = data.map(d => d.finalizados);
-    const metas = data.map(d => d.meta_dia || metaManual);
+    const metas = data.map(d => d.meta_dia !== undefined && d.meta_dia !== null ? d.meta_dia : metaManual);
 
     if (chartManualSemana) chartManualSemana.destroy();
     chartManualSemana = new Chart(document.getElementById('chartManualSemana'), {
@@ -1245,6 +1320,8 @@ document.getElementById('periodFilter').addEventListener('click', function(e) {
         .then(data => {
             renderAutoSemana(data.auto_semana);
             renderManualSemana(data.manual_semana);
+            updateGauge('auto', data.auto_semana);
+            updateGauge('manual', data.manual_semana);
         })
         .catch(err => console.error('Erro ao carregar período:', err));
 });
@@ -1318,6 +1395,52 @@ fetch('/api/historico?data=' + selectedDate)
             cumMeta.push(sumM);
         }
 
+        // Find day when cumulative production reached total meta
+        const totalMetaAuto = sumM;
+        let metaAchievedIdxAuto = -1;
+        if (totalMetaAuto > 0) {
+            let cumSum = 0;
+            for (let i = 0; i < prods.length; i++) {
+                cumSum += prods[i];
+                if (cumSum >= totalMetaAuto) {
+                    metaAchievedIdxAuto = i;
+                    break;
+                }
+            }
+        }
+
+        // Custom plugin to draw a vertical line at the meta achievement day
+        const verticalLinePluginAuto = {
+            id: 'verticalLineAuto',
+            afterDraw(chart) {
+                if (metaAchievedIdxAuto < 0) return;
+                const meta = chart.getDatasetMeta(0);
+                if (!meta.data[metaAchievedIdxAuto]) return;
+                const x = meta.data[metaAchievedIdxAuto].x;
+                const ctx = chart.ctx;
+                const yAxis = chart.scales.y;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = '#198754';
+                ctx.lineWidth = 2;
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                ctx.stroke();
+                // Draw label
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#198754';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('\u2714 Meta mensal atingida', x, yAxis.top - 6);
+                ctx.restore();
+            }
+        };
+
+        // Build point styles: highlight the meta achievement day with a star
+        const pointRadiusAuto = prods.map((v, i) => i === metaAchievedIdxAuto ? 8 : 3);
+        const pointStyleAuto = prods.map((v, i) => i === metaAchievedIdxAuto ? 'star' : 'circle');
+
         new Chart(document.getElementById('chartTendenciaMes'), {
             type: 'line',
             data: {
@@ -1331,8 +1454,11 @@ fetch('/api/historico?data=' + selectedDate)
                         borderWidth: 2,
                         tension: 0.3,
                         fill: true,
-                        pointRadius: 3,
-                        pointBackgroundColor: prods.map((v, i) => v >= metas[i] ? '#198754' : '#dc3545'),
+                        pointRadius: pointRadiusAuto,
+                        pointStyle: pointStyleAuto,
+                        pointBackgroundColor: prods.map((v, i) => i === metaAchievedIdxAuto ? '#198754' : (v >= metas[i] ? '#198754' : '#dc3545')),
+                        pointBorderColor: prods.map((v, i) => i === metaAchievedIdxAuto ? '#198754' : 'transparent'),
+                        pointBorderWidth: prods.map((v, i) => i === metaAchievedIdxAuto ? 2 : 0),
                     },
                     {
                         label: 'Meta Diária',
@@ -1348,11 +1474,18 @@ fetch('/api/historico?data=' + selectedDate)
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: { padding: { top: 20 } },
                 plugins: {
                     legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw)
+                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw),
+                            afterLabel: ctx => {
+                                if (ctx.datasetIndex === 0 && ctx.dataIndex === metaAchievedIdxAuto) {
+                                    return '\u2714 Meta mensal atingida neste dia!';
+                                }
+                                return '';
+                            }
                         }
                     }
                 },
@@ -1365,7 +1498,8 @@ fetch('/api/historico?data=' + selectedDate)
                         ticks: { callback: v => fmtNum(v) }
                     }
                 }
-            }
+            },
+            plugins: [verticalLinePluginAuto]
         });
 
         // ===== LINE CHART — MANUAL LINE MONTHLY TREND =====
@@ -1376,6 +1510,50 @@ fetch('/api/historico?data=' + selectedDate)
             const m = metasPorDia[d.data];
             return m ? m.manual : metaManual;
         });
+
+        // Find day when cumulative finalizados reached total manual meta
+        let totalMetaManual = 0, metaAchievedIdxManual = -1;
+        for (let i = 0; i < manMetas.length; i++) totalMetaManual += manMetas[i];
+        if (totalMetaManual > 0) {
+            let cumSum = 0;
+            for (let i = 0; i < manFin.length; i++) {
+                cumSum += manFin[i];
+                if (cumSum >= totalMetaManual) {
+                    metaAchievedIdxManual = i;
+                    break;
+                }
+            }
+        }
+
+        // Custom plugin for manual line vertical marker
+        const verticalLinePluginManual = {
+            id: 'verticalLineManual',
+            afterDraw(chart) {
+                if (metaAchievedIdxManual < 0) return;
+                const meta = chart.getDatasetMeta(0);
+                if (!meta.data[metaAchievedIdxManual]) return;
+                const x = meta.data[metaAchievedIdxManual].x;
+                const ctx = chart.ctx;
+                const yAxis = chart.scales.y;
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([6, 4]);
+                ctx.strokeStyle = '#198754';
+                ctx.lineWidth = 2;
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#198754';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('\u2714 Meta mensal atingida', x, yAxis.top - 6);
+                ctx.restore();
+            }
+        };
+
+        const pointRadiusManual = manFin.map((v, i) => i === metaAchievedIdxManual ? 8 : 3);
+        const pointStyleManual = manFin.map((v, i) => i === metaAchievedIdxManual ? 'star' : 'circle');
 
         new Chart(document.getElementById('chartTendenciaManual'), {
             type: 'line',
@@ -1390,8 +1568,11 @@ fetch('/api/historico?data=' + selectedDate)
                         borderWidth: 2,
                         tension: 0.3,
                         fill: true,
-                        pointRadius: 3,
-                        pointBackgroundColor: manFin.map(v => v >= metaManual ? '#198754' : '#dc3545'),
+                        pointRadius: pointRadiusManual,
+                        pointStyle: pointStyleManual,
+                        pointBackgroundColor: manFin.map((v, i) => i === metaAchievedIdxManual ? '#198754' : (v >= manMetas[i] ? '#198754' : '#dc3545')),
+                        pointBorderColor: manFin.map((v, i) => i === metaAchievedIdxManual ? '#198754' : 'transparent'),
+                        pointBorderWidth: manFin.map((v, i) => i === metaAchievedIdxManual ? 2 : 0),
                     },
                     {
                         label: 'Meta Diária',
@@ -1407,11 +1588,18 @@ fetch('/api/historico?data=' + selectedDate)
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: { padding: { top: 20 } },
                 plugins: {
                     legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw)
+                            label: ctx => ctx.dataset.label + ': ' + fmtNum(ctx.raw),
+                            afterLabel: ctx => {
+                                if (ctx.datasetIndex === 0 && ctx.dataIndex === metaAchievedIdxManual) {
+                                    return '\u2714 Meta mensal atingida neste dia!';
+                                }
+                                return '';
+                            }
                         }
                     }
                 },
@@ -1424,7 +1612,8 @@ fetch('/api/historico?data=' + selectedDate)
                         ticks: { callback: v => fmtNum(v) }
                     }
                 }
-            }
+            },
+            plugins: [verticalLinePluginManual]
         });
     })
     .catch(err => console.warn('Trend chart error:', err));
