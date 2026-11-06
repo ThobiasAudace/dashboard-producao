@@ -381,7 +381,7 @@ def get_dados_dia(data=None):
     from config import get_meta_periodo
     d_meta = get_meta_periodo(int(data[:4]), int(data[5:7]), data_str=data)
     meta = d_meta['manual']
-    eficiencia = ((finalizados - meta) / meta * 100) if meta > 0 else 0
+    eficiencia = ((finalizados - meta) / meta * 100) if meta > 0 and finalizados > 0 else 0
 
     return {
         'data': data,
@@ -446,7 +446,7 @@ def get_dados_mes(ano=None, mes=None):
         d_str = row['data']
         d_meta = get_meta_periodo(int(d_str[:4]), int(d_str[5:7]), data_str=d_str)
         meta = d_meta['manual']
-        eficiencia = ((fin - meta) / meta * 100) if meta > 0 else 0
+        eficiencia = ((fin - meta) / meta * 100) if meta > 0 and fin > 0 else 0
 
         result.append({
             'data': d_str,
@@ -475,10 +475,21 @@ def get_resumo_mes(ano=None, mes=None):
     total_meta = sum(d['meta'] for d in dados if d['envasados'] > 0 or d['finalizados'] > 0)
     eficiencia = ((total_fin - total_meta) / total_meta * 100) if total_meta > 0 else 0
 
+    # Find date when cumulative finalizados reached total monthly meta
+    data_atingiu_meta = None
+    acum_fin = 0
+    dados_com_prod = [d for d in dados if d['envasados'] > 0 or d['finalizados'] > 0]
+    dados_sorted = sorted(dados_com_prod, key=lambda x: x['data'])
+    for d in dados_sorted:
+        acum_fin += d['finalizados']
+        if acum_fin >= total_meta and data_atingiu_meta is None:
+            data_atingiu_meta = d['data']
+
     return {
         'total_envasados': total_env,
         'total_finalizados': total_fin,
         'total_meta': total_meta,
         'eficiencia_media': round(eficiencia, 1),
         'dias_trabalhados': dias,
+        'data_atingiu_meta': data_atingiu_meta,
     }
