@@ -53,8 +53,12 @@ def get_turno_do_dia(data_ref=None):
 
 def format_number(value):
     """Format number with Brazilian thousands separator."""
+    import math
     try:
-        n = int(value)
+        fval = float(value)
+        if math.isinf(fval) or math.isnan(fval):
+            return '0'
+        n = int(fval)
         return f'{n:,}'.replace(',', '.')
     except (ValueError, TypeError):
         return value
@@ -122,6 +126,7 @@ def dashboard():
     manual_hoje = manual_line.get_dados_dia(data_str)
     manual_semana = manual_line.get_dados_semana(data_ref.date())
     manual_resumo_mes = manual_line.get_resumo_mes(data_ref.year, data_ref.month)
+    manual_resumo_mes_anterior = manual_line.get_resumo_mes(prev_year, prev_month)
     manual_produtos = manual_line.get_produtos_dia(data_str)
 
     # Enrich weekly data with per-day metas
@@ -219,6 +224,9 @@ def dashboard():
     for t in ['Caio', 'Douglas']:
         if turno_comparativo[t]['dias'] > 0:
             turno_comparativo[t]['media'] = int(turno_comparativo[t]['total'] / turno_comparativo[t]['dias'])
+        else:
+            # No data for this turno — reset pior_dia from inf to 0
+            turno_comparativo[t]['pior_dia'] = {'producao': 0, 'data': '-'}
 
     pareto_problemas = excel_reader.get_pareto_problemas(data_ref.year, data_ref.month)
 
@@ -249,6 +257,7 @@ def dashboard():
         manual_hoje=manual_hoje,
         manual_semana=manual_semana,
         manual_resumo_mes=manual_resumo_mes,
+        manual_resumo_mes_anterior=manual_resumo_mes_anterior,
         manual_produtos=manual_produtos,
         absenteismo_hoje=absenteismo_hoje,
         absenteismo_semana=absenteismo_semana,
@@ -282,6 +291,13 @@ def relatorio_pdf():
     auto_resumo_mes = excel_reader.get_resumo_mes(data_ref.year, data_ref.month)
     manual_resumo_mes = manual_line.get_resumo_mes(data_ref.year, data_ref.month)
     
+    if data_ref.month == 1:
+        prev_year_r, prev_month_r = data_ref.year - 1, 12
+    else:
+        prev_year_r, prev_month_r = data_ref.year, data_ref.month - 1
+    auto_resumo_mes_anterior = excel_reader.get_resumo_mes(prev_year_r, prev_month_r)
+    manual_resumo_mes_anterior = manual_line.get_resumo_mes(prev_year_r, prev_month_r)
+
     metas_mes = get_meta_periodo(data_ref.year, data_ref.month)
     meta_auto = metas_mes['auto']
     meta_manual = metas_mes['manual']
