@@ -221,7 +221,7 @@ def get_dados_dia(data=None):
         conn.close()
         if row and (row['producao'] or 0) > 0:
             producao = row['producao'] or 0
-            eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
+            eficiencia = ((producao - meta) / meta * 100) if meta > 0 and producao > 0 else 0
             return {
                 'data': data_str,
                 'producao': producao,
@@ -255,7 +255,7 @@ def get_dados_dia(data=None):
 
     r = row.iloc[0]
     producao = int(r['producao'])
-    eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
+    eficiencia = ((producao - meta) / meta * 100) if meta > 0 and producao > 0 else 0
 
     return {
         'data': data_str,
@@ -323,7 +323,7 @@ def get_dados_mes(ano=None, mes=None):
                 data_str = row['data']
                 m = get_meta_periodo(ano, mes, data_str=data_str)
                 meta = m['auto']
-                eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
+                eficiencia = ((producao - meta) / meta * 100) if meta > 0 and producao > 0 else 0
                 result.append({
                     'data': data_str,
                     'producao': producao,
@@ -353,7 +353,7 @@ def get_dados_mes(ano=None, mes=None):
         from config import get_meta_periodo
         m = get_meta_periodo(ano, mes, data_str=data_str)
         meta = m['auto']
-        eficiencia = ((producao - meta) / meta * 100) if meta > 0 else 0
+        eficiencia = ((producao - meta) / meta * 100) if meta > 0 and producao > 0 else 0
 
         result.append({
             'data': data_str,
@@ -386,13 +386,23 @@ def get_resumo_mes(ano=None, mes=None):
     melhor = max(dados_com_prod, key=lambda x: x['producao']) if dados_com_prod else None
     pior = min(dados_com_prod, key=lambda x: x['producao']) if dados_com_prod else None
 
+    # Find date when cumulative production reached total monthly meta
+    data_atingiu_meta = None
+    acum_prod = 0
+    dados_sorted = sorted(dados_com_prod, key=lambda x: x['data'])
+    for d in dados_sorted:
+        acum_prod += d['producao']
+        if acum_prod >= total_meta and data_atingiu_meta is None:
+            data_atingiu_meta = d['data']
+
     return {
         'total_producao': total_prod,
         'total_meta': total_meta,
         'eficiencia_media': round(eficiencia, 1),
         'dias_trabalhados': dias,
         'melhor_dia': melhor,
-        'pior_dia': pior
+        'pior_dia': pior,
+        'data_atingiu_meta': data_atingiu_meta
     }
 
 
